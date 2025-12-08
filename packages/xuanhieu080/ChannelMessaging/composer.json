@@ -1,0 +1,22 @@
+{
+    "name": "xuanhieu080/channel-messaging",
+    "description": "Multi-channel messaging sync (Shopify, eBay, Facebook, Walmart) for Laravel",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "xuanhieu080\\ChannelMessaging\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "xuanhieu080\\ChannelMessaging\\ChannelMessagingServiceProvider"
+            ]
+        }
+    },
+    "require": {
+        "php": ">=8.0",
+        "webklex/laravel-imap": "^4"
+    }
+}
