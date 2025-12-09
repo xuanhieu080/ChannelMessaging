@@ -9,7 +9,7 @@ class FacebookWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        Log::info("Facebook webhook received");
+        Log::info('gggggg');
         // 1) Bước VERIFY (Facebook gọi GET)
         if ($request->isMethod('get')) {
             $verifyToken = config('message-hub.facebook.verify_token');
