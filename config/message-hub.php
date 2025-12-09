@@ -4,7 +4,7 @@ return [
 
     'facebook' => [
         'page_access_token' => env('FACEBOOK_PAGE_ACCESS_TOKEN'),
-        'graph_version'     => env('FACEBOOK_GRAPH_VERSION', 'v18.0'),
+        'graph_version'     => env('FACEBOOK_GRAPH_VERSION', 'v24.0'),
         'verify_token'     => env('FACEBOOK_VERIFY_TOKEN'),
     ],
 
