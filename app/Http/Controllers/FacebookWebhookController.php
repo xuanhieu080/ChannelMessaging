@@ -4,13 +4,12 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use xuanhieu080\ChannelMessaging\Models\ChannelMessage;
 
 class FacebookWebhookController extends Controller
 {
     public function handle(Request $request)
     {
-        Log::info('gggggg');
-        // 1) Bước VERIFY (Facebook gọi GET)
         if ($request->isMethod('get')) {
             $verifyToken = config('message-hub.facebook.verify_token');
 
@@ -19,7 +18,6 @@ class FacebookWebhookController extends Controller
             $challenge   = $request->query('hub_challenge') ?? $request->query('hub.challenge');
 
             if ($mode === 'subscribe' && $token === $verifyToken) {
-                // Trả về đúng challenge (text/plain)
                 return response($challenge, 200)
                     ->header('Content-Type', 'text/plain');
             }
@@ -27,7 +25,7 @@ class FacebookWebhookController extends Controller
             return response('Forbidden', 403);
         }
 
-        // 2) Bước NHẬN EVENT (Facebook gửi POST)
+
         if ($request->isMethod('post')) {
             // Facebook gửi JSON dạng:
             // {
@@ -51,18 +49,33 @@ class FacebookWebhookController extends Controller
 
     protected function handleEntry(array $entry): void
     {
-        // Mỗi entry có thể chứa nhiều messaging
-        if (!isset($entry['messaging'])) {
-            return;
-        }
+        if (!isset($entry['messaging'])) return;
 
         foreach ($entry['messaging'] as $event) {
-            // Ở đây bạn dispatch job để lưu tin nhắn vào DB
-            // Ví dụ: Dispatch một Job process tin nhắn
-            // ProcessFacebookMessage::dispatch($event);
+            $senderId = $event['sender']['id'] ?? null;
+            $recipientId = $event['recipient']['id'] ?? null;
+            $text = $event['message']['text'] ?? null;
+            $mid = $event['message']['mid'] ?? null;
+            $timestamp = $event['timestamp'] ?? null;
 
-            // Test: log thử
-            \Log::info('FB message event', $event);
+            if (!$mid || !$text) continue;
+
+            ChannelMessage::query()->updateOrCreate(
+                [
+                    'source'      => 'facebook',
+                    'external_id' => $mid,
+                ],
+                [
+                    'thread_id' => $senderId,
+                    'sender'    => $senderId,
+                    'receiver'  => $recipientId,
+                    'direction' => 'in',
+                    'subject'   => null,
+                    'body'      => $text,
+                    'sent_at'   => $timestamp ? \Carbon\Carbon::createFromTimestampMs($timestamp) : now(),
+                    'raw_json'  => json_encode($event),
+                ]
+            );
         }
     }
 }
