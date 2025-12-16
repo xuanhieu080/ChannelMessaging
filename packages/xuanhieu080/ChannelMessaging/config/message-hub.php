@@ -8,6 +8,13 @@ return [
         'verify_token'     => env('FACEBOOK_VERIFY_TOKEN'),
     ],
 
+    'whatsapp' => [
+        'verify_token'     => env('WHATSAPP_VERIFY_TOKEN'),
+        'access_token'     => env('WHATSAPP_ACCESS_TOKEN'),
+        'phone_number_id'  => env('WHATSAPP_PHONE_NUMBER_ID'),
+        'graph_version'    => env('WHATSAPP_GRAPH_VERSION', 'v24.0'),
+    ],
+
     'ebay' => [
         'auth_token'    => env('EBAY_AUTH_TOKEN'),
         'site_id'       => env('EBAY_SITE_ID', 0),
