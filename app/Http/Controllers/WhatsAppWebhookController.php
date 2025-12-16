@@ -11,6 +11,7 @@ class WhatsAppWebhookController extends Controller
 {
     public function handle(Request $request)
     {
+        Log::info('sdfsdfsda fasdfasdft', $request->all());
         // ===== VERIFY =====
         if ($request->isMethod('get')) {
             $verifyToken = config('message-hub.whatsapp.verify_token');
