@@ -3,6 +3,7 @@
 use App\Http\Controllers\EbayController;
 use App\Http\Controllers\FacebookController;
 use App\Http\Controllers\FacebookWebhookController;
+use App\Http\Controllers\ShopifyOrderDbController;
 use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
@@ -16,7 +17,7 @@ Route::get('privacy-policy', function () {
 });
 
 Route::match(['GET', 'POST'], '/webhook/facebook', [FacebookWebhookController::class, 'handle']);
-Route::match(['GET','POST'], '/webhook/whatsapp', [WhatsAppWebhookController::class, 'handle']);
+Route::match(['GET', 'POST'], '/webhook/whatsapp', [WhatsAppWebhookController::class, 'handle']);
 
 
 Route::prefix('fb')->group(function () {
@@ -33,6 +34,16 @@ Route::prefix('whatsapp')->group(function () {
 
 
 Route::prefix('shopify')->group(function () {
+    Route::prefix('db')->group(function () {
+        Route::get('/orders', [ShopifyOrderDbController::class, 'index'])->name('shopify.db.orders');
+        Route::get('/orders/{orderId}', [ShopifyOrderDbController::class, 'show'])->name('shopify.db.orders.show');
+
+        Route::post('/orders/sync', [ShopifyOrderDbController::class, 'syncAll'])->name('shopify.db.orders.syncAll');
+        Route::post('/orders/{orderId}/sync', [ShopifyOrderDbController::class, 'syncOne'])->name('shopify.db.orders.syncOne');
+
+        Route::post('/orders/{orderId}/note', [ShopifyOrderDbController::class, 'updateNote'])->name('shopify.db.orders.updateNote');
+    });
+
     Route::prefix('oauth')->group(function () {
         Route::get('/install', [ShopifyController::class, 'install'])->name('shopify.oauth.install');
         Route::get('/callback', [ShopifyController::class, 'callback'])->name('shopify.oauth.callback');
