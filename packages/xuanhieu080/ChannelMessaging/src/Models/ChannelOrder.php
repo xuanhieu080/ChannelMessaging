@@ -9,7 +9,8 @@ class ChannelOrder extends Model
     protected $table = 'channel_orders';
 
     protected $fillable = [
-        'source','store_key','external_id','external_gid','name','order_number','currency',
+        'source','store_key','external_id','external_gid',
+        'name','order_number','currency',
         'financial_status','fulfillment_status',
         'subtotal_price','total_price','total_tax','total_discounts',
         'email','contact_email','customer_external_id','customer_email',
@@ -25,7 +26,28 @@ class ChannelOrder extends Model
         'processed_at_shop' => 'datetime',
     ];
 
-    public function items() { return $this->hasMany(ChannelOrderItem::class, 'channel_order_id'); }
-    public function addresses() { return $this->hasMany(ChannelOrderAddress::class, 'channel_order_id'); }
-    public function fulfillments() { return $this->hasMany(ChannelOrderFulfillment::class, 'channel_order_id'); }
+    public function items()
+    {
+        return $this->hasMany(ChannelOrderItem::class, 'channel_order_id');
+    }
+
+    public function addresses()
+    {
+        return $this->hasMany(ChannelOrderAddress::class, 'channel_order_id');
+    }
+
+    public function fulfillments()
+    {
+        return $this->hasMany(ChannelOrderFulfillment::class, 'channel_order_id');
+    }
+
+    public function billingAddress()
+    {
+        return $this->hasOne(ChannelOrderAddress::class, 'channel_order_id')->where('type', 'billing');
+    }
+
+    public function shippingAddress()
+    {
+        return $this->hasOne(ChannelOrderAddress::class, 'channel_order_id')->where('type', 'shipping');
+    }
 }
