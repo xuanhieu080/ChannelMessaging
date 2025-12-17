@@ -28,3 +28,9 @@ Route::prefix('whatsapp')->group(function () {
     Route::get('/threads/{threadId}', [WhatsAppController::class, 'show'])->name('wa.threads.show');
     Route::post('/threads/{threadId}/send', [WhatsAppController::class, 'send'])->name('wa.threads.send');
 });
+
+Route::prefix('ebay')->group(function () {
+    Route::get('/threads', [EbayController::class, 'threads'])->name('ebay.threads');
+    Route::get('/threads/{threadId}', [EbayController::class, 'show'])->name('ebay.threads.show');
+    Route::post('/threads/{threadId}/send', [EbayController::class, 'send'])->name('ebay.threads.send');
+});
