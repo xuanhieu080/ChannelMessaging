@@ -25,6 +25,12 @@ return [
         'base_url'    => env('SHOPIFY_BASE_URL'),
         'admin_token' => env('SHOPIFY_ADMIN_TOKEN', ''),
         'api_version' => env('SHOPIFY_API_VERSION', '2025-10'),
+
+        // oauth
+        'client_id'     => env('SHOPIFY_CLIENT_ID'),
+        'client_secret' => env('SHOPIFY_CLIENT_SECRET'),
+        'redirect_uri'  => env('SHOPIFY_REDIRECT_URI'),
+        'scopes'        => env('SHOPIFY_SCOPES', 'read_orders'),
     ],
 
     'walmart_imap' => [
