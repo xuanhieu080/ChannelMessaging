@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Controllers\EbayController;
 use App\Http\Controllers\FacebookController;
 use App\Http\Controllers\FacebookWebhookController;
 use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\ShopifyController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -27,6 +29,22 @@ Route::prefix('whatsapp')->group(function () {
     Route::get('/threads', [WhatsAppController::class, 'threads'])->name('wa.threads');
     Route::get('/threads/{threadId}', [WhatsAppController::class, 'show'])->name('wa.threads.show');
     Route::post('/threads/{threadId}/send', [WhatsAppController::class, 'send'])->name('wa.threads.send');
+});
+
+
+Route::prefix('shopify')->group(function () {
+    Route::prefix('oauth')->group(function () {
+        Route::get('/install', [ShopifyController::class, 'install'])->name('shopify.oauth.install');
+        Route::get('/callback', [ShopifyController::class, 'callback'])->name('shopify.oauth.callback');
+    });
+
+    Route::get('/orders', [ShopifyController::class, 'index'])->name('shopify.orders');
+    Route::get('/orders/{orderId}', [ShopifyController::class, 'show'])->name('shopify.orders.show');
+
+    Route::post('/orders/{orderId}/sync', [ShopifyController::class, 'syncOne'])->name('shopify.orders.syncOne');
+    Route::post('/orders/{orderId}/note', [ShopifyController::class, 'updateNote'])->name('shopify.orders.updateNote');
+
+    Route::post('/orders/sync', [ShopifyController::class, 'syncAll'])->name('shopify.orders.syncAll');
 });
 
 Route::prefix('ebay')->group(function () {

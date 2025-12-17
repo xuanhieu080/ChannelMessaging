@@ -23,8 +23,8 @@ return [
 
     'shopify' => [
         'base_url'    => env('SHOPIFY_BASE_URL'),
-        'admin_token' => env('SHOPIFY_ADMIN_TOKEN'),
-        'api_version' => env('SHOPIFY_API_VERSION', '2024-10'),
+        'admin_token' => env('SHOPIFY_ADMIN_TOKEN', ''),
+        'api_version' => env('SHOPIFY_API_VERSION', '2025-10'),
     ],
 
     'walmart_imap' => [

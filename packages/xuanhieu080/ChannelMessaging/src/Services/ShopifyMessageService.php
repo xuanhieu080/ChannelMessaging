@@ -15,7 +15,7 @@ class ShopifyMessageService
     {
         $this->baseUrl    = rtrim(config('message-hub.shopify.base_url'), '/');
         $this->token      = config('message-hub.shopify.admin_token');
-        $this->apiVersion = config('message-hub.shopify.api_version', '2024-10');
+        $this->apiVersion = config('message-hub.shopify.api_version', '2025-10');
     }
 
     public function syncOrderNotes(): void
