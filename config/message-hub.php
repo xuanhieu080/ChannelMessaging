@@ -37,4 +37,10 @@ return [
         // tên account IMAP đã config trong config/imap.php của app chính
         'account' => env('WALMART_IMAP_ACCOUNT', 'walmart'),
     ],
+
+    'walmart' => [
+        'base_url' => env('WALMART_BASE_URL', 'https://marketplace.walmartapis.com'),
+        'channel_type' => env('WALMART_CHANNEL_TYPE', '0'),
+        'svc_name' => env('WALMART_SVC_NAME', 'YourApp'),
+    ],
 ];

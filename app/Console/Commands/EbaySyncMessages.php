@@ -27,13 +27,13 @@ class EbaySyncMessages extends Command
         $lastKey = 'message_hub:sync_ebay:last_at';
 
         $lock = null;
-        if (!$this->option('force')) {
-            $lock = Cache::lock($lockKey, 300);
-            if (!$lock->get()) {
-                $this->warn('Sync is already running (lock active).');
-                return self::SUCCESS;
-            }
-        }
+//        if (!$this->option('force')) {
+//            $lock = Cache::lock($lockKey, 300);
+//            if (!$lock->get()) {
+//                $this->warn('Sync is already running (lock active).');
+//                return self::SUCCESS;
+//            }
+//        }
 
         $runId = 'run_' . now()->format('Ymd_His') . '_' . substr(bin2hex(random_bytes(6)), 0, 8);
         $runKey = "message_hub:ebay:run:{$runId}";
@@ -48,7 +48,7 @@ class EbaySyncMessages extends Command
             $this->info("Page limit: {$pageLimit}");
             $this->info($this->option('direct') ? 'Mode: DIRECT' : 'Mode: QUEUE');
 
-            if ($this->option('direct')) {
+            if (true || $this->option('direct')) {
                 $stats = $ebay->syncMessages($from, $to, $pageLimit);
 
                 $this->line("Processed: " . ($stats['processed'] ?? 0));

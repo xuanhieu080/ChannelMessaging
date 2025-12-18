@@ -8,6 +8,9 @@ use App\Http\Controllers\WhatsAppController;
 use App\Http\Controllers\WhatsAppWebhookController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ShopifyController;
+use App\Http\Controllers\WalmartAccountController;
+use App\Http\Controllers\WalmartOrderController;
+
 
 Route::get('/', function () {
     return view('welcome');
@@ -62,4 +65,18 @@ Route::prefix('ebay')->group(function () {
     Route::get('/threads', [EbayController::class, 'threads'])->name('ebay.threads');
     Route::get('/threads/{threadId}', [EbayController::class, 'show'])->name('ebay.threads.show');
     Route::post('/threads/{threadId}/send', [EbayController::class, 'send'])->name('ebay.threads.send');
+
+    Route::post('/sync', [EbayController::class, 'sync'])->name('sync');
+});
+
+Route::prefix('walmart')->group(function () {
+    Route::resource('accounts', WalmartAccountController::class);
+    Route::get('accounts/{account}/sync', [WalmartAccountController::class, 'sync'])->name('walmart.accounts.sync');
+    Route::post('walmart/accounts/{account}/sync-now', [WalmartAccountController::class, 'syncNow'])
+        ->name('walmart.accounts.syncNow');
+
+    Route::get('orders', [WalmartOrderController::class, 'index'])->name('walmart.orders.index');
+    Route::get('orders/{order}', [WalmartOrderController::class, 'show'])->name('walmart.orders.show');
+    Route::post('orders/sync', [WalmartOrderController::class, 'sync'])->name('walmart.orders.sync');
+
 });

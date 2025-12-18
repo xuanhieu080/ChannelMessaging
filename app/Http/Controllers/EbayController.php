@@ -87,4 +87,24 @@ class EbayController extends Controller
         return redirect()->route('ebay.threads.show', $threadId)
             ->with('status', 'Đã gửi tin nhắn eBay');
     }
+
+    public function sync(Request $request, EbayMessageService $ebay)
+    {
+        // optional filter thời gian
+        $data = $request->validate([
+            'from' => ['nullable', 'date'],
+            'to'   => ['nullable', 'date', 'after_or_equal:from'],
+        ]);
+
+        $from = isset($data['from']) ? \Carbon\Carbon::parse($data['from']) : now()->subDays(2);
+        $to   = isset($data['to'])   ? \Carbon\Carbon::parse($data['to'])   : now();
+
+        $resp = $ebay->syncInbox($from, $to); // ✅ implement ở service bên dưới
+
+        if (!($resp['ok'] ?? false)) {
+            return back()->withErrors(['sync' => $resp['error'] ?? 'Sync failed']);
+        }
+
+        return back()->with('status', "Đã sync {$resp['synced']}/{$resp['total']} messages");
+    }
 }

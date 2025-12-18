@@ -4,7 +4,6 @@ namespace xuanhieu080\ChannelMessaging\Services;
 
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use xuanhieu080\ChannelMessaging\Models\ChannelMessage;
 
 class EbayMessageService
@@ -16,124 +15,99 @@ class EbayMessageService
 
     public function __construct()
     {
-        // production|sandbox
         $env = config('message-hub.ebay.env', 'production');
+
         $this->endpoint = $env === 'sandbox'
             ? 'https://api.sandbox.ebay.com/ws/api.dll'
             : 'https://api.ebay.com/ws/api.dll';
 
-        // dùng 1 key thống nhất: ebay.auth_token (legacy) hoặc ebay.oauth_token
         $this->token       = (string) (config('message-hub.ebay.auth_token') ?: config('message-hub.ebay.oauth_token'));
         $this->siteId      = (int) config('message-hub.ebay.site_id', 0);
         $this->compatLevel = (string) config('message-hub.ebay.compat_level', '1271');
     }
 
     /**
-     * Pull inbox kiểu eBay My Messages
+     * ✅ Sync inbox bằng Trading API GetMyMessages
      */
-    public function syncMessages(\DateTimeInterface $from = null, \DateTimeInterface $to = null, int $maxPages = 10): array
+    public function syncMessages(?\DateTimeInterface $from = null, ?\DateTimeInterface $to = null, int $maxPages = 10, int $perPage = 200): array
     {
         if (!$this->token) {
-            return ['processed' => 0, 'created' => 0, 'updated' => 0];
+            return ['processed' => 0, 'created' => 0, 'updated' => 0, 'error' => 'Missing eBay token'];
         }
 
-        $page    = 1;
+        $processed = 0;
+        $created   = 0;
+        $updated   = 0;
+
+        $page = 1;
         $hasMore = true;
 
-        $processed = 0;
-        $created = 0;
-        $updated = 0;
-
         while ($hasMore && $page <= $maxPages) {
-            $xmlBody = $this->buildGetMyMessagesRequest($page, $from, $to);
+            $xmlBody = $this->buildGetMyMessagesRequest($page, $from, $to, $perPage);
 
-            $response = Http::withHeaders([
-                'Content-Type'                   => 'text/xml',
-                'X-EBAY-API-CALL-NAME'           => 'GetMyMessages',
-                'X-EBAY-API-SITEID'              => $this->siteId,
-                'X-EBAY-API-COMPATIBILITY-LEVEL' => $this->compatLevel,
-            ])->send('POST', $this->endpoint, [
-                'body' => $xmlBody,
-            ]);
+            $resp = Http::withHeaders($this->headers('GetMyMessages'))
+                ->withBody($xmlBody, 'text/xml')
+                ->post($this->endpoint);
 
-            if (!$response->ok()) {
-                break;
+            if (!$resp->ok()) {
+                return [
+                    'processed' => $processed,
+                    'created'   => $created,
+                    'updated'   => $updated,
+                    'error'     => $resp->body(),
+                ];
             }
 
-            $xml = simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
+            $xml = @simplexml_load_string($resp->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
+            if (!$xml) {
+                return [
+                    'processed' => $processed,
+                    'created'   => $created,
+                    'updated'   => $updated,
+                    'error'     => 'Invalid XML response',
+                ];
+            }
+
+            // Ack check
+            $ack = (string)($xml->Ack ?? '');
+            if ($ack === 'Failure') {
+                return [
+                    'processed' => $processed,
+                    'created'   => $created,
+                    'updated'   => $updated,
+                    'error'     => $resp->body(),
+                ];
+            }
+
+            // Convert XML -> array
             $json = json_decode(json_encode($xml), true);
 
-            $messages = $json['Messages']['Message'] ?? [];
+            $messages = data_get($json, 'Messages.Message', []);
 
-            if (isset($messages['MessageID'])) {
+            // Nếu chỉ 1 message thì nó là object (associative array)
+            if (is_array($messages) && isset($messages['MessageID'])) {
                 $messages = [$messages];
+            }
+            if (!is_array($messages)) {
+                $messages = [];
             }
 
             foreach ($messages as $msg) {
                 $processed++;
-                $r = $this->storeMessageWithResult($msg); // new helper
+                $r = $this->storeMessageWithResult($msg);
                 $created += $r['created'] ? 1 : 0;
                 $updated += $r['updated'] ? 1 : 0;
             }
 
-            $hasMore = filter_var($json['HasMoreMessages'] ?? false, FILTER_VALIDATE_BOOLEAN);
+            $hasMore = $this->toBool($json['HasMoreMessages'] ?? false);
             $page++;
         }
 
         return compact('processed', 'created', 'updated');
     }
 
-    protected function storeMessageWithResult(array $msg): array
-    {
-        $externalId = $msg['MessageID'] ?? null;
-        if (!$externalId) {
-            return ['created' => false, 'updated' => false];
-        }
-
-        $subject  = $msg['Subject'] ?? null;
-        $body     = $msg['Text'] ?? ($msg['Content'] ?? null);
-        $sentAt   = $msg['ReceiveDate'] ?? null;
-        $sender   = $msg['Sender'] ?? null;
-        $receiver = $msg['RecipientUserID'] ?? null;
-
-        $threadId = $msg['ExternalMessageID'] ?? null;
-
-        $values = [
-            'thread_id' => $threadId,
-            'sender'    => $sender,
-            'receiver'  => $receiver,
-            'direction' => 'in',
-            'subject'   => $subject,
-            'body'      => $body,
-            'sent_at'   => $sentAt ? new \DateTime($sentAt) : null,
-            'raw_json'  => json_encode($msg),
-        ];
-
-        $model = ChannelMessage::query()->where('source', 'ebay')->where('external_id', $externalId)->first();
-
-        if (!$model) {
-            ChannelMessage::query()->create(array_merge([
-                'source' => 'ebay',
-                'external_id' => $externalId,
-            ], $values));
-
-            return ['created' => true, 'updated' => false];
-        }
-
-        $model->fill($values);
-        $dirty = $model->isDirty();
-        if ($dirty) {
-            $model->save();
-            return ['created' => false, 'updated' => true];
-        }
-
-        return ['created' => false, 'updated' => false];
-    }
-
-
     /**
-     * Reply (buyer/seller) trong context order: AddMemberMessageAAQToPartner
-     * threadId format đề xuất: itemId:buyerId:transactionId (transactionId có thể rỗng)
+     * Reply: AddMemberMessageAAQToPartner
      */
     public function sendReply(string $itemId, string $buyerId, string $subject, string $body, ?string $transactionId = null): array
     {
@@ -154,25 +128,86 @@ class EbayMessageService
             </MemberMessage>
         ");
 
-        $response = Http::withHeaders($this->headers('AddMemberMessageAAQToPartner'))
+        $resp = Http::withHeaders($this->headers('AddMemberMessageAAQToPartner'))
             ->withBody($xmlBody, 'text/xml')
             ->post($this->endpoint);
 
-        if (!$response->ok()) {
-            return ['ok' => false, 'error' => $response->body()];
+        if (!$resp->ok()) {
+            return ['ok' => false, 'error' => $resp->body()];
         }
 
-        // Ack check
-        $xml = @simplexml_load_string($response->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
+        $xml = @simplexml_load_string($resp->body(), 'SimpleXMLElement', LIBXML_NOCDATA);
         if (!$xml) {
             return ['ok' => false, 'error' => 'Invalid XML response'];
         }
-        $ack = (string) ($xml->Ack ?? '');
+
+        $ack = (string)($xml->Ack ?? '');
         if ($ack === 'Failure') {
-            return ['ok' => false, 'error' => $response->body()];
+            return ['ok' => false, 'error' => $resp->body()];
         }
 
-        return ['ok' => true, 'raw' => $response->body()];
+        return ['ok' => true, 'raw' => $resp->body()];
+    }
+
+    // ====================== storage ======================
+
+    protected function storeMessageWithResult(array $msg): array
+    {
+        $externalId = $msg['MessageID'] ?? null;
+        if (!$externalId) {
+            return ['created' => false, 'updated' => false];
+        }
+
+        $subject  = $msg['Subject'] ?? null;
+        $body     = $msg['Text'] ?? ($msg['Content'] ?? null);
+        $sentAt   = $msg['ReceiveDate'] ?? null;
+
+        $sender   = $msg['Sender'] ?? null;
+        $receiver = $msg['RecipientUserID'] ?? null;
+
+        $itemId = $msg['ItemID'] ?? null;
+        $txnId  = $msg['TransactionID'] ?? null;
+
+        // ✅ thread_id: ưu tiên ExternalMessageID; fallback itemId:sender:txnId; cuối cùng MessageID
+        $threadId = $msg['ExternalMessageID'] ?? null;
+        if (!$threadId) {
+            $parts = array_filter([$itemId, $sender, $txnId], fn($v) => $v !== null && $v !== '');
+            $threadId = $parts ? implode(':', $parts) : (string)$externalId;
+        }
+
+        $values = [
+            'thread_id' => $threadId,
+            'sender'    => $sender,
+            'receiver'  => $receiver,
+            'direction' => 'in',
+            'subject'   => $subject,
+            'body'      => $body,
+            'sent_at'   => $sentAt ? $this->parseDate($sentAt) : null,
+            'raw_json'  => json_encode($msg, JSON_UNESCAPED_UNICODE),
+        ];
+
+        $model = ChannelMessage::query()
+            ->where('source', 'ebay')
+            ->where('external_id', (string)$externalId)
+            ->first();
+
+        if (!$model) {
+            ChannelMessage::query()->create(array_merge([
+                'source'      => 'ebay',
+                'external_id' => (string)$externalId,
+            ], $values));
+
+            return ['created' => true, 'updated' => false];
+        }
+
+        $model->fill($values);
+
+        if ($model->isDirty()) {
+            $model->save();
+            return ['created' => false, 'updated' => true];
+        }
+
+        return ['created' => false, 'updated' => false];
     }
 
     // ====================== internals ======================
@@ -182,12 +217,12 @@ class EbayMessageService
         return [
             'Content-Type'                   => 'text/xml',
             'X-EBAY-API-CALL-NAME'           => $callName,
-            'X-EBAY-API-SITEID'              => (string) $this->siteId,
-            'X-EBAY-API-COMPATIBILITY-LEVEL' => $this->compatLevel,
+            'X-EBAY-API-SITEID'              => (string)$this->siteId,
+            'X-EBAY-API-COMPATIBILITY-LEVEL' => (string)$this->compatLevel,
         ];
     }
 
-    protected function buildGetMyMessagesRequest(int $page, ?\DateTimeInterface $from, ?\DateTimeInterface $to): string
+    protected function buildGetMyMessagesRequest(int $page, ?\DateTimeInterface $from, ?\DateTimeInterface $to, int $perPage): string
     {
         $fromStr = $from ? gmdate('Y-m-d\TH:i:s.000\Z', $from->getTimestamp()) : null;
         $toStr   = $to   ? gmdate('Y-m-d\TH:i:s.000\Z', $to->getTimestamp()) : null;
@@ -200,7 +235,7 @@ class EbayMessageService
             {$startTimeXml}
             {$endTimeXml}
             <Pagination>
-                <EntriesPerPage>200</EntriesPerPage>
+                <EntriesPerPage>{$perPage}</EntriesPerPage>
                 <PageNumber>{$page}</PageNumber>
             </Pagination>
         ");
@@ -208,7 +243,6 @@ class EbayMessageService
 
     protected function wrapXml(string $root, string $inner): string
     {
-        // Trading API namespace
         return '<?xml version="1.0" encoding="utf-8"?>'
             . "<{$root} xmlns=\"urn:ebay:apis:eBLBaseComponents\">"
             . "<RequesterCredentials><eBayAuthToken>{$this->esc($this->token)}</eBayAuthToken></RequesterCredentials>"
@@ -216,51 +250,21 @@ class EbayMessageService
             . "</{$root}>";
     }
 
-    protected function storeMessage(array $msg): void
-    {
-        $externalId = $msg['MessageID'] ?? null;
-        if (!$externalId) return;
-
-        $subject  = $msg['Subject'] ?? null;
-        $body     = $msg['Text'] ?? ($msg['Content'] ?? '');
-        $sentAt   = $msg['ReceiveDate'] ?? null;
-
-        $sender   = $msg['Sender'] ?? null;
-        $receiver = $msg['RecipientUserID'] ?? null;
-
-        $itemId = $msg['ItemID'] ?? null;
-        $txnId  = $msg['TransactionID'] ?? null;
-
-        // Ưu tiên ExternalMessageID nếu có, fallback theo itemId+sender+txnId
-        $threadId = $msg['ExternalMessageID'] ?? null;
-        if (!$threadId) {
-            $parts = [];
-            if ($itemId) $parts[] = $itemId;
-            if ($sender) $parts[] = $sender;
-            if ($txnId)  $parts[] = $txnId;
-            $threadId = implode(':', $parts) ?: $externalId;
-        }
-
-        ChannelMessage::query()->updateOrCreate(
-            [
-                'source'      => 'ebay',
-                'external_id' => $externalId,
-            ],
-            [
-                'thread_id' => $threadId,
-                'sender'    => $sender,
-                'receiver'  => $receiver,
-                'direction' => 'in',
-                'subject'   => $subject,
-                'body'      => $body,
-                'sent_at'   => $sentAt ? Carbon::parse($sentAt) : now(),
-                'raw_json'  => json_encode($msg),
-            ]
-        );
-    }
-
     protected function esc(string $s): string
     {
         return htmlspecialchars($s, ENT_XML1 | ENT_COMPAT, 'UTF-8');
+    }
+
+    protected function parseDate($value): ?Carbon
+    {
+        if (!$value) return null;
+        try { return Carbon::parse($value); } catch (\Throwable) { return null; }
+    }
+
+    protected function toBool($value): bool
+    {
+        if (is_bool($value)) return $value;
+        $v = strtolower(trim((string)$value));
+        return in_array($v, ['1', 'true', 'yes', 'y'], true);
     }
 }

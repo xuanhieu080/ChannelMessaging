@@ -1,9 +1,9 @@
 <?php
 
-namespace xuanhieu080\ChannelMessaging\Services;
+namespace xuanhieu080\ChannelMessaging\Services\Walmart;
 
-use xuanhieu080\ChannelMessaging\Models\ChannelMessage;
 use Webklex\IMAP\Facades\Client;
+use xuanhieu080\ChannelMessaging\Models\ChannelMessage;
 
 class WalmartMessageService
 {

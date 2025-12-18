@@ -19,6 +19,34 @@
     <button>Search</button>
 </form>
 
+<h1>eBay Inbox</h1>
+
+@if(session('status'))
+    <div style="padding:10px;border:1px solid #0a0;border-radius:10px;margin:10px 0;">
+        {{ session('status') }}
+    </div>
+@endif
+
+@if($errors->has('sync'))
+    <div style="padding:10px;border:1px solid #a00;border-radius:10px;margin:10px 0;">
+        {{ $errors->first('sync') }}
+    </div>
+@endif
+
+<form>
+    <input name="q" value="{{ $q }}" placeholder="Search item / buyer / text">
+    <button>Search</button>
+</form>
+
+{{-- ✅ Sync manual --}}
+<form method="POST" action="{{ route('ebay.sync') }}" style="margin:10px 0; display:flex; gap:8px; align-items:center;">
+    @csrf
+    <input type="date" name="from" value="{{ request('from') }}">
+    <input type="date" name="to" value="{{ request('to') }}">
+    <button type="submit">Sync messages</button>
+</form>
+
+
 @foreach($rows as $r)
     @php $last = $lastMap[$r->last_id] ?? null; @endphp
     <div class="row">
