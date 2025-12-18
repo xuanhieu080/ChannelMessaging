@@ -66,7 +66,7 @@ Route::prefix('ebay')->group(function () {
     Route::get('/threads/{threadId}', [EbayController::class, 'show'])->name('ebay.threads.show');
     Route::post('/threads/{threadId}/send', [EbayController::class, 'send'])->name('ebay.threads.send');
 
-    Route::post('/sync', [EbayController::class, 'sync'])->name('sync');
+    Route::post('/sync', [EbayController::class, 'sync'])->name('ebay.sync');
 });
 
 Route::prefix('walmart')->group(function () {
