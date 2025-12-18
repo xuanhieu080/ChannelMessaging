@@ -99,7 +99,7 @@ class EbayController extends Controller
         $from = isset($data['from']) ? \Carbon\Carbon::parse($data['from']) : now()->subDays(2);
         $to   = isset($data['to'])   ? \Carbon\Carbon::parse($data['to'])   : now();
 
-        $resp = $ebay->syncMessages($from, $to); // ✅ implement ở service bên dưới
+        $resp = $ebay->syncMessages($from, $to, 10); // ✅ implement ở service bên dưới
 
         if (!($resp['ok'] ?? false)) {
             return back()->withErrors(['sync' => $resp['error'] ?? 'Sync failed']);
